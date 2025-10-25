@@ -26,12 +26,14 @@ def format_currency(value: float) -> str:
     if value.is_integer():
         return str(int(value))
     else:
-        # Оставляем до 4 знаков после запятой, убираем лишние нули
         formatted = f"{value:.4f}"
         return formatted.rstrip('0').rstrip('.')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [['📊 Рассчитать позицию', '❓ Помощь']]
+    # Очищаем данные пользователя
+    context.user_data.clear()
+
+    keyboard = [['📊 Рассчитать позицию']]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
     await update.message.reply_text(
@@ -41,6 +43,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
+    return ConversationHandler.END
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = """
@@ -60,8 +63,12 @@ SL: 49000
 Риск: 100
 """
     await update.message.reply_text(help_text, parse_mode='Markdown')
+    return ConversationHandler.END
 
 async def calc_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Очищаем предыдущие данные
+    context.user_data.clear()
+
     await update.message.reply_text(
         "💰 *Цена входа (USDT):*",
         reply_markup=ReplyKeyboardRemove(),
@@ -124,7 +131,7 @@ async def risk_amount_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Проверка логики
         if (tp > entry and sl > entry) or (tp < entry and sl < entry):
-            error_msg = "❌ *Ошибка!*\n\n"
+            error_msg = "❌ *Ошибка логики!*\n\n"
             if tp > entry:
                 error_msg += "Для *ЛОНГА*:\n• TP > Входа ✅\n• SL < Входа ❌\n\nВведите SL ниже цены входа"
             else:
@@ -133,7 +140,7 @@ async def risk_amount_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(error_msg, parse_mode='Markdown')
 
             # Предлагаем новый расчет
-            keyboard = [['🔄 Новый расчет']]
+            keyboard = [['📊 Рассчитать позицию']]
             reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             await update.message.reply_text("🔄 Нажмите для нового расчета", reply_markup=reply_markup)
             return ConversationHandler.END
@@ -185,31 +192,24 @@ async def risk_amount_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
         await update.message.reply_text(result, parse_mode='Markdown')
 
-        # Кнопка для нового расчета
-        keyboard = [['🔄 Новый расчет']]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-        await update.message.reply_text(
-            "✨ *Расчет завершен!*\n\n"
-            "Нажми *🔄 Новый расчет* для следующей позиции",
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
-        )
-
     except Exception as e:
         logger.error(f"Ошибка: {e}")
+        await update.message.reply_text("❌ Ошибка расчета")
 
-        keyboard = [['🔄 Новый расчет']]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        await update.message.reply_text(
-            "❌ Ошибка расчета\n\nНажми *🔄 Новый расчет* для повторного расчета",
-            reply_markup=reply_markup
-        )
+    # Всегда показываем кнопку для нового расчета
+    keyboard = [['📊 Рассчитать позицию']]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
+    await update.message.reply_text(
+        "✨ *Расчет завершен!*\n\n"
+        "Нажми *📊 Рассчитать позицию* для следующей позиции",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [['📊 Рассчитать позицию', '❓ Помощь']]
+    keyboard = [['📊 Рассчитать позицию']]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
     await update.message.reply_text(
@@ -223,17 +223,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == '📊 Рассчитать позицию':
         return await calc_start(update, context)
-    elif text == '❓ Помощь':
-        return await help_command(update, context)
-    elif text == '🔄 Новый расчет':
-        return await calc_start(update, context)
     else:
-        keyboard = [['📊 Рассчитать позицию', '❓ Помощь']]
+        keyboard = [['📊 Рассчитать позицию']]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         await update.message.reply_text(
-            "🤔 Используйте кнопки для навигации",
-            reply_markup=reply_markup
+            "Нажми *📊 Рассчитать позицию* чтобы начать расчет",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
         )
+        return ConversationHandler.END
 
 def main():
     TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -248,7 +246,8 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler('calc', calc_start),
-            CommandHandler('start', start)
+            CommandHandler('start', start),
+            MessageHandler(filters.Text(['📊 Рассчитать позицию']), calc_start)
         ],
         states={
             ENTRY_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, entry_price_input)],
@@ -256,15 +255,17 @@ def main():
             STOP_LOSS: [MessageHandler(filters.TEXT & ~filters.COMMAND, stop_loss_input)],
             RISK_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, risk_amount_input)],
         },
-        fallbacks=[CommandHandler('cancel', cancel)]
+        fallbacks=[CommandHandler('cancel', cancel)],
+        allow_reentry=True
     )
 
     # Обработчики
     application.add_handler(conv_handler)
+    application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("🎯 Трейдинг бот запущен!")
+    print("🔄 Бот перезапущен с исправлениями!")
     application.run_polling()
 
 if __name__ == '__main__':
