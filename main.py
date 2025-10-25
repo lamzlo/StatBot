@@ -22,13 +22,13 @@ def parse_number(text: str) -> float:
         raise ValueError("Некорректное число")
 
 def format_currency(value: float) -> str:
-    """Форматирование валюты"""
-    if value >= 1000:
-        return f"{value:,.0f}".replace(",", " ")
-    elif value >= 1:
-        return f"{value:.2f}".rstrip('0').rstrip('.')
+    """Форматирование валюты без разделителей"""
+    if value.is_integer():
+        return str(int(value))
     else:
-        return f"{value:.4f}".rstrip('0').rstrip('.')
+        # Оставляем до 4 знаков после запятой, убираем лишние нули
+        formatted = f"{value:.4f}"
+        return formatted.rstrip('0').rstrip('.')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [['📊 Рассчитать позицию', '❓ Помощь']]
@@ -131,6 +131,11 @@ async def risk_amount_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 error_msg += "Для *ШОРТА*:\n• TP < Входа ✅\n• SL > Входа ❌\n\nВведите SL выше цены входа"
 
             await update.message.reply_text(error_msg, parse_mode='Markdown')
+
+            # Предлагаем новый расчет
+            keyboard = [['🔄 Новый расчет']]
+            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            await update.message.reply_text("🔄 Нажмите для нового расчета", reply_markup=reply_markup)
             return ConversationHandler.END
 
         # Расчеты
@@ -166,22 +171,22 @@ async def risk_amount_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 *{trade_type}* | {rating}
 
 📊 *Параметры позиции:*
-├ Размер: `{format_currency(position_size)} USDT`
-├ Плечо: `{leverage}x`
-├ Маржа: `{format_currency(margin)} USDT`
-├ Прибыль: `{format_currency(potential_profit)} USDT`
-└ R/R: `1:{risk_reward:.2f}`
+├ Размер: {format_currency(position_size)} USDT
+├ Плечо: {leverage}x
+├ Маржа: {format_currency(margin)} USDT
+├ Прибыль: {format_currency(potential_profit)} USDT
+└ R/R: 1:{risk_reward:.2f}
 
 🎯 *Уровни:*
-├ Вход: `{format_currency(entry)}`
-├ TP: `{format_currency(tp)}`
-├ SL: `{format_currency(sl)}`
-└ Риск: `{format_currency(risk)} USDT`
+├ Вход: {format_currency(entry)}
+├ TP: {format_currency(tp)}
+├ SL: {format_currency(sl)}
+└ Риск: {format_currency(risk)} USDT
 """
         await update.message.reply_text(result, parse_mode='Markdown')
 
         # Кнопка для нового расчета
-        keyboard = [['🔄 Новый расчет', '📊 История']]
+        keyboard = [['🔄 Новый расчет']]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
         await update.message.reply_text(
@@ -193,7 +198,13 @@ async def risk_amount_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"Ошибка: {e}")
-        await update.message.reply_text("❌ Ошибка расчета\n\n🔄 Нажми /calc для нового расчета")
+
+        keyboard = [['🔄 Новый расчет']]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        await update.message.reply_text(
+            "❌ Ошибка расчета\n\nНажми *🔄 Новый расчет* для повторного расчета",
+            reply_markup=reply_markup
+        )
 
     return ConversationHandler.END
 
@@ -216,8 +227,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await help_command(update, context)
     elif text == '🔄 Новый расчет':
         return await calc_start(update, context)
-    elif text == '📊 История':
-        await update.message.reply_text("📊 *История расчетов*\n\n(функция в разработке)", parse_mode='Markdown')
     else:
         keyboard = [['📊 Рассчитать позицию', '❓ Помощь']]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -255,7 +264,7 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("🎯 Красивый трейдинг бот запущен!")
+    print("🎯 Трейдинг бот запущен!")
     application.run_polling()
 
 if __name__ == '__main__':
