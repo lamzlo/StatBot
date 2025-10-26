@@ -179,6 +179,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
+    return ConversationHandler.END
 
 def main():
     TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -193,7 +194,7 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler('start', start),
-            MessageHandler(filters.Text(['📊 Рассчитать позицию']), calc_start)
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
         ],
         states={
             ENTRY_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, entry_price_input)],
@@ -206,7 +207,6 @@ def main():
     )
     
     application.add_handler(conv_handler)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     logger.info("🚀 Бот запущен на Render!")
     application.run_polling()
