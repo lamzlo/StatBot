@@ -187,7 +187,6 @@ def main():
         logger.error("❌ TELEGRAM_BOT_TOKEN не установлен!")
         return
     
-    # Создаем приложение без job_queue
     application = Application.builder().token(TOKEN).build()
     
     # Диалог расчета
@@ -208,8 +207,10 @@ def main():
     
     application.add_handler(conv_handler)
     
-    logger.info("🚀 Бот запущен на Render с Python 3.11!")
+    logger.info("🚀 Бот запущен в Docker с Python 3.11!")
     application.run_polling()
 
+if __name__ == '__main__':
+    main()
 if __name__ == '__main__':
     main()
