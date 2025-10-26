@@ -10,10 +10,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Получаем токен из переменных окружения
+# Получаем токен
 TOKEN = '8365218444:AAGbG4i-OWT8Rb2JiqNfiLfj7it6OUd9lac'
-if not TOKEN:
-    raise ValueError("TELEGRAM_TOKEN environment variable is not set")
 
 # Команда /start
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -50,11 +48,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     try:
         # Создаем приложение
-        application = (
-            Application.builder()
-            .token(TOKEN)
-            .build()
-        )
+        application = Application.builder().token(TOKEN).build()
 
         # Добавляем обработчики
         application.add_handler(CommandHandler("start", start_command))
@@ -66,10 +60,7 @@ def main():
 
         # Запускаем бота
         logger.info("Бот запускается...")
-        application.run_polling(
-            allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True
-        )
+        application.run_polling()
         
     except Exception as e:
         logger.error(f"Ошибка при запуске бота: {e}")
