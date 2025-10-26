@@ -179,7 +179,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
-    return ConversationHandler.END
 
 def main():
     TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -188,6 +187,7 @@ def main():
         logger.error("❌ TELEGRAM_BOT_TOKEN не установлен!")
         return
     
+    # Создаем приложение без job_queue
     application = Application.builder().token(TOKEN).build()
     
     # Диалог расчета
@@ -208,7 +208,7 @@ def main():
     
     application.add_handler(conv_handler)
     
-    logger.info("🚀 Бот запущен на Render!")
+    logger.info("🚀 Бот запущен на Render с Python 3.11!")
     application.run_polling()
 
 if __name__ == '__main__':
