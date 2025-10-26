@@ -30,12 +30,11 @@ def format_currency(value: float) -> str:
         return formatted.rstrip('0').rstrip('.')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Очищаем данные пользователя
     context.user_data.clear()
-
+    
     keyboard = [['📊 Рассчитать позицию']]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
+    
     await update.message.reply_text(
         "🎯 *Трейдинг Калькулятор*\n\n"
         "Быстрый расчет позиции с риск-менеджментом\n\n"
@@ -43,32 +42,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
-    return ConversationHandler.END
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    help_text = """
-💡 *Как использовать:*
-
-1. Нажми *📊 Рассчитать позицию*
-2. Вводи параметры по очереди:
-   - Цена входа
-   - Тейк-профит  
-   - Стоп-лосс
-   - Сумма риска
-
-📈 *Пример:*
-Вход: 50000
-TP: 52000  
-SL: 49000
-Риск: 100
-"""
-    await update.message.reply_text(help_text, parse_mode='Markdown')
-    return ConversationHandler.END
 
 async def calc_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Очищаем предыдущие данные
     context.user_data.clear()
-
     await update.message.reply_text(
         "💰 *Цена входа (USDT):*",
         reply_markup=ReplyKeyboardRemove(),
@@ -82,7 +58,6 @@ async def entry_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if price <= 0:
             await update.message.reply_text("❌ Цена должна быть > 0\n💰 Введите цену входа:")
             return ENTRY_PRICE
-
         context.user_data['entry_price'] = price
         await update.message.reply_text("🎯 *Тейк-профит (USDT):*", parse_mode='Markdown')
         return TAKE_PROFIT
@@ -96,7 +71,6 @@ async def take_profit_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if tp <= 0:
             await update.message.reply_text("❌ Цена должна быть > 0\n🎯 Тейк-профит:")
             return TAKE_PROFIT
-
         context.user_data['take_profit'] = tp
         await update.message.reply_text("🛑 *Стоп-лосс (USDT):*", parse_mode='Markdown')
         return STOP_LOSS
@@ -110,7 +84,6 @@ async def stop_loss_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if sl <= 0:
             await update.message.reply_text("❌ Цена должна быть > 0\n🛑 Стоп-лосс:")
             return STOP_LOSS
-
         context.user_data['stop_loss'] = sl
         await update.message.reply_text("💸 *Сумма риска (USDT):*", parse_mode='Markdown')
         return RISK_AMOUNT
@@ -124,27 +97,22 @@ async def risk_amount_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if risk <= 0:
             await update.message.reply_text("❌ Риск должен быть > 0\n💸 Сумма риска:")
             return RISK_AMOUNT
-
+            
         entry = context.user_data['entry_price']
         tp = context.user_data['take_profit']
         sl = context.user_data['stop_loss']
-
+        
         # Проверка логики
         if (tp > entry and sl > entry) or (tp < entry and sl < entry):
             error_msg = "❌ *Ошибка логики!*\n\n"
             if tp > entry:
-                error_msg += "Для *ЛОНГА*:\n• TP > Входа ✅\n• SL < Входа ❌\n\nВведите SL ниже цены входа"
+                error_msg += "Для *ЛОНГА*:\n• TP > Входа ✅\n• SL < Входа ❌"
             else:
-                error_msg += "Для *ШОРТА*:\n• TP < Входа ✅\n• SL > Входа ❌\n\nВведите SL выше цены входа"
-
+                error_msg += "Для *ШОРТА*:\n• TP < Входа ✅\n• SL > Входа ❌"
+            
             await update.message.reply_text(error_msg, parse_mode='Markdown')
-
-            # Предлагаем новый расчет
-            keyboard = [['📊 Рассчитать позицию']]
-            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            await update.message.reply_text("🔄 Нажмите для нового расчета", reply_markup=reply_markup)
-            return ConversationHandler.END
-
+            return await show_restart_button(update)
+        
         # Расчеты
         price_diff = abs(entry - sl)
         position_size = (risk / price_diff) * entry
@@ -153,25 +121,17 @@ async def risk_amount_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         profit_diff = abs(tp - entry)
         potential_profit = (position_size / entry) * profit_diff
         risk_reward = potential_profit / risk
-
-        # Тип сделки и цвет
-        if tp > entry:
-            trade_type = "🟢 ЛОНГ"
-            color = "🟢"
-        else:
-            trade_type = "🔴 ШОРТ" 
-            color = "🔴"
-
-        # Оценка сделки
-        if risk_reward >= 3:
-            rating = "⭐️⭐️⭐️ ОТЛИЧНО"
-        elif risk_reward >= 2:
-            rating = "⭐️⭐️ ХОРОШО"
-        elif risk_reward >= 1:
-            rating = "⭐️ НОРМАЛЬНО"
-        else:
-            rating = "⚠️  РИСКОВАННО"
-
+        
+        # Тип сделки
+        trade_type = "🟢 ЛОНГ" if tp > entry else "🔴 ШОРТ"
+        color = "🟢" if tp > entry else "🔴"
+        
+        # Оценка
+        if risk_reward >= 3: rating = "⭐️⭐️⭐️ ОТЛИЧНО"
+        elif risk_reward >= 2: rating = "⭐️⭐️ ХОРОШО"
+        elif risk_reward >= 1: rating = "⭐️ НОРМАЛЬНО"
+        else: rating = "⚠️ РИСКОВАННО"
+        
         # Результат
         result = f"""
 {color} *РЕЗУЛЬТАТ РАСЧЕТА* {color}
@@ -191,61 +151,47 @@ async def risk_amount_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 └ Риск: {format_currency(risk)} USDT
 """
         await update.message.reply_text(result, parse_mode='Markdown')
-
+        
     except Exception as e:
         logger.error(f"Ошибка: {e}")
         await update.message.reply_text("❌ Ошибка расчета")
+    
+    return await show_restart_button(update)
 
-    # Всегда показываем кнопку для нового расчета
+async def show_restart_button(update: Update):
     keyboard = [['📊 Рассчитать позицию']]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
     await update.message.reply_text(
-        "✨ *Расчет завершен!*\n\n"
-        "Нажми *📊 Рассчитать позицию* для следующей позиции",
+        "✨ *Расчет завершен!*\n\nНажми *📊 Рассчитать позицию* для следующей позиции",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
     return ConversationHandler.END
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == '📊 Рассчитать позицию':
+        return await calc_start(update, context)
+    
     keyboard = [['📊 Рассчитать позицию']]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
     await update.message.reply_text(
-        "❌ Расчет отменен",
-        reply_markup=reply_markup
+        "Нажми *📊 Рассчитать позицию* чтобы начать расчет",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
     )
-    return ConversationHandler.END
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-
-    if text == '📊 Рассчитать позицию':
-        return await calc_start(update, context)
-    else:
-        keyboard = [['📊 Рассчитать позицию']]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        await update.message.reply_text(
-            "Нажми *📊 Рассчитать позицию* чтобы начать расчет",
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
-        )
-        return ConversationHandler.END
 
 def main():
     TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-
+    
     if not TOKEN:
-        print("❌ Ошибка: TELEGRAM_BOT_TOKEN не установлен!")
+        logger.error("❌ TELEGRAM_BOT_TOKEN не установлен!")
         return
-
+    
     application = Application.builder().token(TOKEN).build()
-
+    
     # Диалог расчета
     conv_handler = ConversationHandler(
         entry_points=[
-            CommandHandler('calc', calc_start),
             CommandHandler('start', start),
             MessageHandler(filters.Text(['📊 Рассчитать позицию']), calc_start)
         ],
@@ -255,17 +201,14 @@ def main():
             STOP_LOSS: [MessageHandler(filters.TEXT & ~filters.COMMAND, stop_loss_input)],
             RISK_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, risk_amount_input)],
         },
-        fallbacks=[CommandHandler('cancel', cancel)],
+        fallbacks=[],
         allow_reentry=True
     )
-
-    # Обработчики
+    
     application.add_handler(conv_handler)
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    print("🔄 Бот перезапущен с исправлениями!")
+    
+    logger.info("🚀 Бот запущен на Render!")
     application.run_polling()
 
 if __name__ == '__main__':
