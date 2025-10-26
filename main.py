@@ -10,8 +10,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Получаем токен
+# Получаем токен из переменных окружения
 TOKEN = '8365218444:AAGbG4i-OWT8Rb2JiqNfiLfj7it6OUd9lac'
+if not TOKEN:
+    raise ValueError("TELEGRAM_TOKEN environment variable is not set")
 
 # Команда /start
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
