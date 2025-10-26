@@ -1,0 +1,10 @@
+services:
+  - type: worker
+    name: telegram-trading-bot
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: 8365218444:AAGbG4i-OWT8Rb2JiqNfiLfj7it6OUd9lac
+        sync: false
