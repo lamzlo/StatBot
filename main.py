@@ -234,7 +234,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
 def main():
-    TOKEN = os.environ.get('8365218444:AAGbG4i-OWT8Rb2JiqNfiLfj7it6OUd9lac')
+    TOKEN = '8365218444:AAGbG4i-OWT8Rb2JiqNfiLfj7it6OUd9lac'
     
     if not TOKEN:
         print("❌ Ошибка: TELEGRAM_BOT_TOKEN не установлен!")
